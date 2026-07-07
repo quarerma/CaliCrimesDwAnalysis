@@ -1,0 +1,40 @@
+services:
+  oltp_database:
+    image: postgres:16
+    container_name: oltp_database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: oltp
+      POSTGRES_USER: oltp
+      POSTGRES_PASSWORD: oltp
+    ports:
+      - "5433:5432"
+    volumes:
+      - oltp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oltp -d oltp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: oltp_pgadmin
+    restart: unless-stopped
+    depends_on:
+      oltp_database:
+        condition: service_healthy
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@oltp.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+
+volumes:
+  oltp_pgdata:
+  pgadmin_data:

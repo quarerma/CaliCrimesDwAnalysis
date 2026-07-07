@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "oltp_database",
+      "Group": "Servers",
+      "Host": "oltp_database",
+      "Port": 5432,
+      "MaintenanceDB": "oltp",
+      "Username": "oltp",
+      "SSLMode": "prefer",
+      "Comment": "OLTP Postgres (Chicago Crimes staging)"
+    }
+  }
+}
