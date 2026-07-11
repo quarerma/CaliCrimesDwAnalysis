@@ -38,23 +38,16 @@
 --                      types WITHIN one block (a test asserts this). Meaningless
 --                      summed across blocks.
 
-with crimes as (
-    select
-        c.block_key,
-        l.location_description
-    from {{ ref('fct_crimes') }} c
-    join {{ ref('dim_location') }} l
-        on l.location_key = c.location_key
-),
-
-counted as (
+with counted as (
+    -- location_type_key is read straight off the fact -- no join to dim_location
+    -- needed since place type became its own dimension. NULL location_description
+    -- was already routed to the unknown member upstream, so this reconciles to
+    -- fct_crimes with nothing dropped.
     select
         block_key,
-        -- NULL location_description lands on the unknown member rather than
-        -- becoming a NULL FK, so this table still reconciles to fct_crimes.
-        coalesce(md5(location_description), md5('__UNKNOWN__')) as location_type_key,
-        count(*)                                                as crime_count
-    from crimes
+        location_type_key,
+        count(*) as crime_count
+    from {{ ref('fct_crimes') }}
     group by 1, 2
 )
 

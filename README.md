@@ -29,25 +29,62 @@ dbt build   --profiles-dir .   # build models + run tests
 dbt docs generate --profiles-dir . && dbt docs serve --profiles-dir .   # browse docs
 ```
 
-Models (`dbt/models/`):
+### Dimensions (10)
 
-| Layer   | Model            | Schema       | Grain                |
-|---------|------------------|--------------|----------------------|
-| staging | `stg_crimes`     | `dw_staging` | one crime (cleaned)  |
-| marts   | `dim_date`       | `dw_marts`   | one calendar day     |
-| marts   | `dim_crime_type` | `dw_marts`   | one IUCR code        |
-| marts   | `dim_location`   | `dw_marts`   | one location combo   |
-| marts   | `fct_crimes`     | `dw_marts`   | one reported crime   |
+| Model | Grain | Rows |
+|---|---|---|
+| `dim_date` | one calendar day | 9,311 |
+| `dim_month` ▽ | one month | 306 |
+| `dim_time_of_day` | one minute of the day | 1,440 |
+| `dim_hour` ▽ | one hour | 24 |
+| `dim_crime_type` | one IUCR code | 418 |
+| `dim_crime_category` ▽ | one primary_type | 33 |
+| `dim_location` | one admin geography combo | 2,446 |
+| `dim_location_type` | one kind of place | 219 |
+| `dim_block` | one city block | 65,968 |
+| `dim_community_area` | one community area | 79 |
 
-Column descriptions & tests live in the `schema.yml` files
-(`dbt/models/staging/*.yml`, `dbt/models/marts/schema.yml`) — edit the
-`description:` fields there to document columns; they flow into `dbt docs`.
+▽ = shrunken conformed dimension (rollup of a base dimension).
+
+### Facts (6)
+
+| Model | Kimball type | Grain | Rows |
+|---|---|---|---|
+| `fct_crimes` | Transaction | one reported crime | 8,587,983 |
+| `fct_monthly_crime_types` | Periodic snapshot | month × crime type | 75,552 |
+| `fct_crime_types_cumulative` | Cumulative snapshot | month × crime type (dense) | 127,908 |
+| `fct_monthly_area_crimes` | Periodic snapshot | month × area × category | 382,043 |
+| `fct_hourly_crime_profile` | Aggregate (profile) | hour × weekday × type | 48,403 |
+| `fct_block_location_profile` | Aggregate (profile) | block × location type | 632,399 |
+
+Every derived fact is built **from `fct_crimes`**, never from staging, and a test
+in `dbt/tests/` reconciles each one back to the atomic fact. `dbt build` runs
+**91 tests**.
+
+Column documentation lives in the model `.sql` headers, next to the code it
+describes; `schema.yml` carries model descriptions and the data tests.
+
+## Documentação dimensional
+
+| Documento | Conteúdo |
+|---|---|
+| [`docs/01-modelagem-dimensional.md`](docs/01-modelagem-dimensional.md) | Processos de negócio, granularidades, dimensões, fatos, aditividade, métricas-armadilha |
+| [`docs/02-diagrama-estrela.md`](docs/02-diagrama-estrela.md) | Diagramas do modelo estrela + linhagem (DAG) |
+| [`docs/03-matriz-barramento.md`](docs/03-matriz-barramento.md) | Matriz de barramento e dimensões conformadas |
 
 ## 3. Power BI (Desktop + Report Builder)
 
 Power BI Desktop and Report Builder are **Windows-only** Microsoft apps — no
-native Linux build exists. To run them on this Linux host, use the bundled
-Windows-in-Docker VM (requires `/dev/kvm`, already present here):
+native Linux build exists.
+
+The simplest path is to run Power BI Desktop on a **real Windows machine** and
+point it at this Postgres over the LAN (use `hostname -I` on the host to get the
+IP, port `5433`, database `oltp`, schema `dw_marts`, user/pass `oltp`/`oltp`).
+
+A bundled Windows-in-Docker VM (`docker-compose.powerbi.yml`) also exists, but it
+needs **~30 GB of free disk** for the Windows install plus a ~6 GB ISO download.
+Check `df -h /` before starting it — if `/` is tight, the install will die
+partway through:
 
 ```bash
 docker compose -f docker-compose.powerbi.yml up -d

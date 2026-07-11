@@ -82,7 +82,11 @@ models:
         data_tests: [unique, not_null]
 
   - name: dim_location
-    description: Location dimension, one row per distinct administrative/location combination.
+    description: >
+      Administrative-location dimension: one row per beat/district/ward/community
+      -area combination (~2,446). Place type was split out into dim_location_type
+      -- the two are independent, and combining them cross-produced this table to
+      84,501 rows. Beat, ward and community area are overlapping, NOT nested.
     columns:
       - name: location_key
         data_tests: [unique, not_null]
@@ -131,6 +135,13 @@ models:
               arguments:
                 to: ref('dim_location')
                 field: location_key
+      - name: location_type_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_location_type')
+                field: location_type_key
       - name: block_key
         data_tests:
           - not_null
