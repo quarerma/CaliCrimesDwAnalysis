@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: stg_crimes
+    description: >
+      Cleaned, typed staging view over orm.crimes. One row per crime with a
+      YYYYMMDD date_key. Rows with a null crime_date are dropped.
+    columns:
+      - name: crime_id
+        description: Unique record identifier for the crime (primary key).
+        data_tests:
+          - unique
+          - not_null
+      - name: case_number
+        description: Chicago PD RD (records division) number for the incident.
+      - name: crime_date
+        description: Date and time the crime occurred.
+        data_tests:
+          - not_null
+      - name: block
+        description: Partially redacted address block where the crime occurred.
+      - name: iucr
+        description: Illinois Uniform Crime Reporting code.
+      - name: primary_type
+        description: Primary crime category (upper-cased).
+      - name: description
+        description: Detailed IUCR description (upper-cased).
+      - name: location_description
+        description: Location type where the crime occurred (upper-cased).
+      - name: arrest
+        description: Whether an arrest was made.
+      - name: domestic
+        description: Whether the incident was domestic-violence related.
+      - name: beat
+        description: Police beat where the incident occurred.
+      - name: district
+        description: Police district where the incident occurred.
+      - name: ward
+        description: City Council ward where the incident occurred.
+      - name: community_area
+        description: Community area (1-77) where the incident occurred.
+      - name: fbi_code
+        description: FBI NIBRS crime classification code.
+      - name: x_coordinate
+        description: X coordinate (State Plane Illinois East, ft).
+      - name: y_coordinate
+        description: Y coordinate (State Plane Illinois East, ft).
+      - name: year
+        description: Year the crime occurred.
+      - name: updated_on
+        description: Timestamp the source record was last updated.
+      - name: latitude
+        description: Latitude of the location (WGS84).
+      - name: longitude
+        description: Longitude of the location (WGS84).
+      - name: date_key
+        description: YYYYMMDD integer surrogate key linking to dim_date.
+        data_tests:
+          - not_null

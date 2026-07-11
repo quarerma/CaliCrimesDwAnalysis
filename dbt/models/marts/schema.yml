@@ -1,0 +1,111 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# Star schema for the Chicago Crimes DW.
+# Edit the `description:` fields below to refine column documentation; they
+# flow into `dbt docs` and can be surfaced in Power BI.
+# ---------------------------------------------------------------------------
+
+models:
+  - name: dim_date
+    description: Calendar date dimension, one row per day present in the data.
+    columns:
+      - name: date_key
+        description: YYYYMMDD integer surrogate key (primary key).
+        data_tests: [unique, not_null]
+      - name: full_date
+        description: The calendar date.
+      - name: year
+        description: Four-digit year.
+      - name: quarter
+        description: Calendar quarter (1-4).
+      - name: month
+        description: Month number (1-12).
+      - name: month_name
+        description: Full month name (e.g. "January").
+      - name: day_of_month
+        description: Day of the month (1-31).
+      - name: day_of_week
+        description: ISO day of week (1 = Monday, 7 = Sunday).
+      - name: day_name
+        description: Full weekday name (e.g. "Monday").
+      - name: is_weekend
+        description: True when the day is Saturday or Sunday.
+
+  - name: dim_crime_type
+    description: Crime-type dimension, one row per IUCR code.
+    columns:
+      - name: crime_type_key
+        description: md5(iucr) surrogate key (primary key).
+        data_tests: [unique, not_null]
+      - name: iucr
+        description: Illinois Uniform Crime Reporting code (natural key).
+      - name: primary_type
+        description: Primary crime category for the IUCR code.
+      - name: description
+        description: Detailed description for the IUCR code.
+      - name: fbi_code
+        description: FBI NIBRS classification code.
+
+  - name: dim_location
+    description: Location dimension, one row per distinct administrative/location combination.
+    columns:
+      - name: location_key
+        description: md5 surrogate key over the location attributes (primary key).
+        data_tests: [unique, not_null]
+      - name: beat
+        description: Police beat.
+      - name: district
+        description: Police district.
+      - name: ward
+        description: City Council ward.
+      - name: community_area
+        description: Community area (1-77).
+      - name: location_description
+        description: Type of location where crimes occurred (e.g. STREET, APARTMENT).
+
+  - name: fct_crimes
+    description: Crimes fact table. Grain is one reported crime.
+    columns:
+      - name: crime_id
+        description: Unique crime identifier (primary key, from source id).
+        data_tests: [unique, not_null]
+      - name: case_number
+        description: Chicago PD RD number (degenerate dimension).
+      - name: crime_date
+        description: Date and time the crime occurred.
+      - name: date_key
+        description: FK to dim_date.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: crime_type_key
+        description: FK to dim_crime_type. Null when the source IUCR is missing.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_crime_type')
+                field: crime_type_key
+      - name: location_key
+        description: FK to dim_location.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_location')
+                field: location_key
+      - name: arrest
+        description: Whether an arrest was made.
+      - name: domestic
+        description: Whether the incident was domestic-violence related.
+      - name: block
+        description: Partially redacted address block.
+      - name: latitude
+        description: Latitude of the location (WGS84).
+      - name: longitude
+        description: Longitude of the location (WGS84).
+      - name: is_crime
+        description: Constant 1, convenient additive counter for aggregations.

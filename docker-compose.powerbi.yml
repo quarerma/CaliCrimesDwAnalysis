@@ -1,0 +1,52 @@
+# -----------------------------------------------------------------------------
+# Power BI Desktop + Report Builder on Docker (via a Windows 11 VM).
+#
+# Power BI Desktop and Report Builder are Windows-only Microsoft apps: there is
+# no native Linux build and no official Docker image. This runs a real Windows
+# VM inside a container (dockur/windows, QEMU/KVM) that you access in a browser;
+# you then install Power BI Desktop + Report Builder inside that Windows.
+#
+# Requirements (already verified on this machine): /dev/kvm and /dev/net/tun.
+#
+# Start:   docker compose -f docker-compose.powerbi.yml up -d
+# View:    http://localhost:8006   (Windows installs automatically on first run)
+# RDP:     localhost:3389  (user "poweruser" / pass "poweruser")
+# Stop:    docker compose -f docker-compose.powerbi.yml down
+#
+# Connect Power BI to the Postgres DW:
+#   Get Data -> PostgreSQL database
+#   Server:   20.20.20.1        (the host gateway as seen from the VM)
+#             ^ if that fails, use this host's LAN IP (`hostname -I`)
+#   Port:     5433              (append as "20.20.20.1:5433" in the Server box)
+#   Database: oltp
+#   Schema:   dw_marts          (fct_crimes + dim_* live here)
+#   User/pw:  oltp / oltp
+# -----------------------------------------------------------------------------
+services:
+  powerbi_windows:
+    image: dockurr/windows
+    container_name: powerbi_windows
+    environment:
+      VERSION: "11"          # Windows 11; use "10" for Windows 10
+      RAM_SIZE: "8G"
+      CPU_CORES: "4"
+      DISK_SIZE: "64G"
+      USERNAME: "poweruser"
+      PASSWORD: "poweruser"
+      # LANGUAGE: "English"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "8006:8006"          # noVNC web viewer
+      - "3389:3389/tcp"      # RDP
+      - "3389:3389/udp"
+    volumes:
+      - windows_data:/storage
+    restart: on-failure
+    stop_grace_period: 2m
+
+volumes:
+  windows_data:

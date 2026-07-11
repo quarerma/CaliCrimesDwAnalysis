@@ -1,0 +1,57 @@
+version: 2
+
+sources:
+  - name: orm
+    description: >
+      OLTP landing schema populated by load_data.py from the
+      "Crimes_-_2001_to_Present.csv" export. One row per reported crime.
+    schema: orm
+    tables:
+      - name: crimes
+        description: Raw reported crimes, loaded 1:1 from the source CSV.
+        columns:
+          - name: id
+            description: Unique record identifier for the crime (primary key).
+            data_tests:
+              - unique
+              - not_null
+          - name: case_number
+            description: Chicago PD RD (records division) number for the incident.
+          - name: crime_date
+            description: Date and time the crime occurred (best estimate).
+          - name: block
+            description: Partially redacted address block where the crime occurred.
+          - name: iucr
+            description: Illinois Uniform Crime Reporting code.
+          - name: primary_type
+            description: Primary description of the IUCR code (crime category).
+          - name: description
+            description: Secondary, more detailed description of the IUCR code.
+          - name: location_description
+            description: Description of the location where the crime occurred.
+          - name: arrest
+            description: Whether an arrest was made.
+          - name: domestic
+            description: Whether the incident was domestic-violence related.
+          - name: beat
+            description: Police beat where the incident occurred.
+          - name: district
+            description: Police district where the incident occurred.
+          - name: ward
+            description: City Council district (ward) where the incident occurred.
+          - name: community_area
+            description: Community area (1-77) where the incident occurred.
+          - name: fbi_code
+            description: FBI NIBRS crime classification code.
+          - name: x_coordinate
+            description: X coordinate (State Plane Illinois East, ft).
+          - name: y_coordinate
+            description: Y coordinate (State Plane Illinois East, ft).
+          - name: year
+            description: Year the crime occurred.
+          - name: updated_on
+            description: Timestamp the source record was last updated.
+          - name: latitude
+            description: Latitude of the location (WGS84).
+          - name: longitude
+            description: Longitude of the location (WGS84).

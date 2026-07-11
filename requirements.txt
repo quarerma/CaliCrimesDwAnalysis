@@ -1,3 +1,7 @@
 SQLAlchemy==2.0.36
 psycopg2-binary==2.9.10
 python-dotenv==1.0.1
+
+# Data warehouse transformations
+dbt-core==1.11.12
+dbt-postgres==1.10.2

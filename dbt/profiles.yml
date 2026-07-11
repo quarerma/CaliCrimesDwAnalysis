@@ -1,0 +1,20 @@
+# dbt connection profile for the Chicago Crimes DW.
+# Values default to the same settings as the project .env / docker-compose.yml,
+# so `dbt run` works out of the box. Override any of them via environment
+# variables (same names as .env) when needed.
+cali_crimes_dw:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST', 'localhost') }}"
+      port: "{{ env_var('DB_PORT', '5433') | int }}"
+      user: "{{ env_var('DB_USER', 'oltp') }}"
+      password: "{{ env_var('DB_PASSWORD', 'oltp') }}"
+      dbname: "{{ env_var('DB_NAME', 'oltp') }}"
+      # Warehouse output schema. Staging -> "dw_staging", marts -> "dw_marts"
+      # (see macros/generate_schema_name.sql).
+      schema: dw
+      threads: 4
+      keepalives_idle: 0
+      sslmode: prefer
