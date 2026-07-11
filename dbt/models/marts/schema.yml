@@ -2,8 +2,14 @@ version: 2
 
 # ---------------------------------------------------------------------------
 # Star schema for the Chicago Crimes DW.
-# Edit the `description:` fields below to refine column documentation; they
-# flow into `dbt docs` and can be surfaced in Power BI.
+#
+# Column-level documentation lives in the model .sql files, next to the code it
+# describes. This file carries model-level descriptions and the data tests only.
+#
+# Fact types (Kimball):
+#   fct_crimes                   TRANSACTION       one row per event
+#   fct_monthly_crime_types      PERIODIC SNAPSHOT one row per type per month
+#   fct_crime_types_cumulative   CUMULATIVE SNAPSHOT  running totals to date
 # ---------------------------------------------------------------------------
 
 models:
@@ -11,101 +17,253 @@ models:
     description: Calendar date dimension, one row per day present in the data.
     columns:
       - name: date_key
-        description: YYYYMMDD integer surrogate key (primary key).
         data_tests: [unique, not_null]
-      - name: full_date
-        description: The calendar date.
-      - name: year
-        description: Four-digit year.
-      - name: quarter
-        description: Calendar quarter (1-4).
-      - name: month
-        description: Month number (1-12).
-      - name: month_name
-        description: Full month name (e.g. "January").
-      - name: day_of_month
-        description: Day of the month (1-31).
-      - name: day_of_week
-        description: ISO day of week (1 = Monday, 7 = Sunday).
-      - name: day_name
-        description: Full weekday name (e.g. "Monday").
-      - name: is_weekend
-        description: True when the day is Saturday or Sunday.
+
+  - name: dim_month
+    description: >
+      Month dimension, one row per calendar month in the data. A shrunken
+      conformed rollup of dim_date -- built from it so labels always agree.
+    columns:
+      - name: month_key
+        data_tests: [unique, not_null]
+
+  - name: dim_time_of_day
+    description: >
+      Time-of-day dimension, one row per minute of the day (1440). Kept separate
+      from dim_date -- a combined date+time dimension would run to ~13M rows.
+      Generated as a complete spine, not derived from observed crime times.
+    columns:
+      - name: time_key
+        data_tests: [unique, not_null]
 
   - name: dim_crime_type
     description: Crime-type dimension, one row per IUCR code.
     columns:
       - name: crime_type_key
-        description: md5(iucr) surrogate key (primary key).
         data_tests: [unique, not_null]
       - name: iucr
-        description: Illinois Uniform Crime Reporting code (natural key).
+        data_tests: [unique, not_null]
+
+  - name: dim_crime_category
+    description: >
+      Crime-category dimension (primary_type, 34 rows). Shrunken conformed
+      rollup of dim_crime_type from IUCR grain to category grain.
+    columns:
+      - name: crime_category_key
+        data_tests: [unique, not_null]
       - name: primary_type
-        description: Primary crime category for the IUCR code.
-      - name: description
-        description: Detailed description for the IUCR code.
-      - name: fbi_code
-        description: FBI NIBRS classification code.
+        data_tests: [unique, not_null]
+
+  - name: dim_hour
+    description: >
+      Hour dimension (24 rows). Shrunken conformed rollup of dim_time_of_day.
+      Carries day_part and the is_midnight_default data-quality flag.
+    columns:
+      - name: hour_key
+        data_tests: [unique, not_null]
+
+  - name: dim_community_area
+    description: >
+      Community-area dimension (1-77), plus an explicit unknown member (-1) for
+      source NULLs. Area 0 is a source placeholder, also flagged is_unknown.
+      Boundaries are stable over the full span -- the only geography here safe
+      for long-run trends. NO POPULATION: raw counts are a trap metric.
+    columns:
+      - name: community_area_key
+        data_tests: [unique, not_null]
+
+  - name: dim_location_type
+    description: >
+      Location-type dimension (218 kinds of place), plus an unknown member for
+      NULL location_description. Note 'OTHER' is a real recorded category, not
+      a synonym for missing -- the two are kept distinct.
+    columns:
+      - name: location_type_key
+        data_tests: [unique, not_null]
 
   - name: dim_location
     description: Location dimension, one row per distinct administrative/location combination.
     columns:
       - name: location_key
-        description: md5 surrogate key over the location attributes (primary key).
         data_tests: [unique, not_null]
-      - name: beat
-        description: Police beat.
-      - name: district
-        description: Police district.
-      - name: ward
-        description: City Council ward.
-      - name: community_area
-        description: Community area (1-77).
-      - name: location_description
-        description: Type of location where crimes occurred (e.g. STREET, APARTMENT).
+
+  - name: dim_block
+    description: >
+      Block dimension, one row per distinct city block. Chicago publishes
+      addresses at block level, so this is the finest geography in the source.
+    columns:
+      - name: block_key
+        data_tests: [unique, not_null]
+      - name: block
+        data_tests: [unique, not_null]
 
   - name: fct_crimes
-    description: Crimes fact table. Grain is one reported crime.
+    description: >
+      TRANSACTION fact. Grain is one reported crime. case_number is a true
+      degenerate dimension: unique per crime, so nothing to normalise out.
     columns:
       - name: crime_id
-        description: Unique crime identifier (primary key, from source id).
         data_tests: [unique, not_null]
-      - name: case_number
-        description: Chicago PD RD number (degenerate dimension).
-      - name: crime_date
-        description: Date and time the crime occurred.
       - name: date_key
-        description: FK to dim_date.
         data_tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('dim_date')
                 field: date_key
+      - name: time_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_time_of_day')
+                field: time_key
       - name: crime_type_key
-        description: FK to dim_crime_type. Null when the source IUCR is missing.
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_crime_type')
                 field: crime_type_key
       - name: location_key
-        description: FK to dim_location.
         data_tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('dim_location')
                 field: location_key
-      - name: arrest
-        description: Whether an arrest was made.
-      - name: domestic
-        description: Whether the incident was domestic-violence related.
-      - name: block
-        description: Partially redacted address block.
-      - name: latitude
-        description: Latitude of the location (WGS84).
-      - name: longitude
-        description: Longitude of the location (WGS84).
-      - name: is_crime
-        description: Constant 1, convenient additive counter for aggregations.
+      - name: block_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_block')
+                field: block_key
+
+  - name: fct_monthly_crime_types
+    description: >
+      PERIODIC SNAPSHOT fact, refreshed at each month end. Grain is one row per
+      (month, crime type) that occurred; measures describe activity DURING that
+      month and are additive. Sparse -- a month/type pair with no crimes has no
+      row. Rolled up from fct_crimes, so it always reconciles to the atomic fact.
+    columns:
+      - name: month_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_month')
+                field: month_key
+      - name: crime_type_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_crime_type')
+                field: crime_type_key
+
+  - name: fct_crime_types_cumulative
+    description: >
+      CUMULATIVE SNAPSHOT fact, rewritten at each month end. Grain is one row per
+      (month, crime type) -- DENSE, including months where a type had zero
+      crimes, so a running total never has a gap. Cumulative and YTD measures are
+      NON-ADDITIVE across months: read one row, never sum them.
+      NB this is not a Kimball ACCUMULATING snapshot -- that needs milestone
+      dates (arrested / charged / disposed) which the Chicago source does not
+      carry. Only an arrest boolean exists, with no arrest date.
+    columns:
+      - name: month_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_month')
+                field: month_key
+      - name: crime_type_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_crime_type')
+                field: crime_type_key
+
+  - name: fct_monthly_area_crimes
+    description: >
+      PERIODIC SNAPSHOT fact, refreshed at each month end. Grain is one row per
+      (month, community area, crime category). The geographic counterpart to
+      fct_monthly_crime_types -- "where is crime rising" rather than "which".
+      TRAP METRIC: crime_count is a raw count with no population to normalise
+      against, so it ranks areas by how BUSY they are, not how DANGEROUS.
+      Compare an area's crime MIX, not its volume.
+    columns:
+      - name: month_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_month')
+                field: month_key
+      - name: community_area_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_community_area')
+                field: community_area_key
+      - name: crime_category_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_crime_category')
+                field: crime_category_key
+
+  - name: fct_hourly_crime_profile
+    description: >
+      AGGREGATE fact (temporal profile). Grain is one row per (hour, day of week,
+      crime type). Collapses all 25 years into a 24x7 behavioural profile -- a
+      shape, not a time series. Do not plot it as a trend.
+      Hour 0 is inflated by unknown times defaulting to 00:00; filter
+      dim_hour.is_midnight_default before drawing conclusions.
+    columns:
+      - name: hour_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_hour')
+                field: hour_key
+      - name: crime_type_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_crime_type')
+                field: crime_type_key
+
+  - name: fct_block_location_profile
+    description: >
+      AGGREGATE fact (compositional profile). Grain is one row per (block,
+      location type). Built INSTEAD of a dominant-location-type attribute on
+      dim_block, because that label is a trap metric: the modal type looks
+      strong (52.6% avg) only because tiny blocks inflate it -- on blocks with
+      >=100 crimes it falls to 36.2%.
+      share_of_block is SELF-NORMALISING, which makes this the honest way to
+      compare blocks despite having no population data. Ask "which blocks have
+      an unusually violent mix", never "which block is most dangerous".
+      block_crime_count is NOT additive (it repeats per row); share_of_block is
+      semi-additive (sums to 1.0 within a block only).
+    columns:
+      - name: block_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_block')
+                field: block_key
+      - name: location_type_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_location_type')
+                field: location_type_key
