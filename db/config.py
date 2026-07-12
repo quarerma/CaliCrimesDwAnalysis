@@ -11,7 +11,7 @@ DB_USER = os.getenv("DB_USER", "oltp")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "oltp")
 DB_SCHEMA = os.getenv("DB_SCHEMA", "orm")
 
-CSV_PATH = os.getenv("CSV_PATH", "Crimes_-_2001_to_Present.csv")
+CSV_PATH = os.getenv("CSV_PATH", "export.csv")
 
 
 def sqlalchemy_url() -> str:
